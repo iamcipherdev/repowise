@@ -151,6 +151,13 @@ export type SystemEdgeKind =
   | "co_change"
   | "db";
 
+/**
+ * What an edge kind means at the system level. Mirrors core's
+ * `EDGE_KIND_FAMILY` (`repowise.core.workspace.system_graph`), the one owner of
+ * kind-to-family; read `SystemEdge.family` rather than mapping kinds here.
+ */
+export type SystemEdgeFamily = "runtime" | "data" | "build" | "history";
+
 /** How confidently an edge was matched. Behavioral co-change edges are `inferred`. */
 export type SystemEdgeMatchType = "exact" | "candidate" | "manual" | "inferred";
 
@@ -183,11 +190,12 @@ export type ServiceGroupSource = "tag" | "name" | "linked";
 
 /**
  * A group of services the map can draw as one card. Mirrors
- * `repowise.core.workspace.grouping.ServiceGroup`. Groups exist only on estates
- * over 40 services where two or more groups of 2+ services form.
+ * `repowise.core.workspace.grouping.ServiceGroup`. Core alone decides when to
+ * group (`MIN_SERVICES_TO_GROUP`, `MIN_GROUPS`): a non-empty `groups` list is
+ * the answer, so a view never re-derives the gate.
  */
 export interface ServiceGroup {
-  /** Stable id, `"<source>:<key>"`. */
+  /** `tag:<name>`, `name:<prefix>` or `linked:<smallest member id>`. */
   id: string;
   label: string;
   source: ServiceGroupSource;
@@ -210,6 +218,8 @@ export interface SystemEdge {
   contract_refs: string[];
   /** Strategy of the link that gave the edge its confidence; null on a co-change edge. */
   strategy?: LinkStrategyWire | null;
+  /** The kind's family, set by core (an unknown kind is `history`). */
+  family?: SystemEdgeFamily | null;
 }
 
 export interface SystemGraph {

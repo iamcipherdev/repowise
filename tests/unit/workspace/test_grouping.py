@@ -101,11 +101,11 @@ def test_only_a_group_tag_declares_a_group():
 
 
 def test_declared_name_reads_only_group_tags():
-    assert grouping._declared_name(["group:", " web "]) is None
-    assert grouping._declared_name(["backend"]) is None
-    assert grouping._declared_name(["group:", "group: core "]) == "core"
-    assert grouping._declared_name(["edge", "Group: Checkout"]) == "Checkout"
-    assert grouping._declared_name([]) is None
+    assert grouping.declared_group(["group:", " web "]) is None
+    assert grouping.declared_group(["backend"]) is None
+    assert grouping.declared_group(["group:", "group: core "]) == "core"
+    assert grouping.declared_group(["edge", "Group: Checkout"]) == "Checkout"
+    assert grouping.declared_group([]) is None
 
 
 def test_lone_tag_falls_through_to_name_family():
@@ -160,10 +160,30 @@ def test_linkage_clusters_ungrouped_services_on_runtime_edges():
     assignment, groups = group_services(nodes, edges)
     assert {(g.id, g.label, g.source, g.member_count) for g in groups} == {
         ("linked:l0", "l0", "linked", 4),
-        ("linked:r3", "r3", "linked", 4),
+        ("linked:r0", "r3", "linked", 4),
     }
     assert all(assignment[n.id] == "linked:l0" for n in left)
     assert not any(nid.startswith("solo") for nid in assignment)
+
+
+def test_linked_id_survives_a_new_caller():
+    def linked(extra: list[SystemEdge]) -> list[tuple[str, str]]:
+        nodes = _family("ordering", 3) + [_node(f"x{c}") for c in "abcd"] + _filler(40)
+        pairs = ("ad", "bd", "cd", "ab", "bc", "ac")
+        edges = [_edge(f"x{s}", f"x{t}") for s, t in pairs] + extra
+        return [(g.id, g.label) for g in group_services(nodes, edges)[1] if g.source == "linked"]
+
+    # The id names the smallest member; the label the most-called one.
+    assert linked([]) == [("linked:xa", "xd")]
+    # xc gains a caller and ties xd: the label moves, the id does not.
+    assert linked([_edge("xd", "xc")]) == [("linked:xa", "xc")]
+
+
+def test_unknown_edge_kind_is_history_and_never_links():
+    nodes = _family("ordering", 3) + [_node(f"x{i}") for i in range(3)] + _filler(40)
+    edges = [_edge("x1", "x0", "carrier_pigeon"), _edge("x2", "x0", "carrier_pigeon")]
+    assert edges[0].family == "history"
+    assert group_services(nodes, edges) == ({}, [])
 
 
 def test_linkage_skips_services_already_grouped():

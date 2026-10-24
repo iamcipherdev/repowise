@@ -17,6 +17,8 @@ from typing import Any
 
 import yaml
 
+from repowise.core.workspace.grouping import declared_group
+
 _log = logging.getLogger("repowise.workspace.config")
 
 # ---------------------------------------------------------------------------
@@ -317,13 +319,14 @@ class WorkspaceConfig:
         """Hash of the settings the cross-repo analysis reads.
 
         Compared with the one the last analysis run stamped, so editing the
-        ``contracts:`` or ``conformance:`` block, or a repo's ``tags:`` (read by
-        conformance and service grouping), re-runs it with no repo changed.
+        ``contracts:`` or ``conformance:`` block, or a repo's declared service
+        group (its ``group:<name>`` tag), re-runs it with no repo changed. Other
+        tags stay out, so editing a conformance tag never forces a re-analysis.
         """
         payload: list[Any] = [self.contracts.to_dict(), self.conformance.to_dict()]
-        tags = {r.alias: r.tags for r in self.repos if r.tags}
-        if tags:  # only when declared, so an untagged workspace keeps its stamp
-            payload.append(tags)
+        groups = {r.alias: name for r in self.repos if (name := declared_group(r.tags))}
+        if groups:  # only when declared, so every other workspace keeps its stamp
+            payload.append(groups)
         return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()[:16]
 
     def save(self, workspace_root: Path) -> Path:

@@ -77,9 +77,26 @@ _CONTRACT_TYPE_TO_EDGE_KIND: dict[str, str] = {
     "code": "package",
 }
 
-#: All edge kinds the graph can carry. ``db`` carries the shared-table
-#: (``data``) contracts; the taxonomy is fixed so views render consistently.
+#: Every edge kind the graph can carry, mapped to its family: ``runtime`` (a
+#: call or message at run time), ``data`` (a shared store; ``db`` carries the
+#: ``data`` contracts), ``build`` (a manifest or package reference) or
+#: ``history`` (correlated change). The one owner of kind-to-family: views read
+#: the ``family`` each edge carries, and grouping clusters on it.
+EDGE_KIND_FAMILY: dict[str, str] = {
+    "http": "runtime",
+    "grpc": "runtime",
+    "socket": "runtime",
+    "event": "runtime",
+    "db": "data",
+    "package": "build",
+    "co_change": "history",
+}
+
+#: All edge kinds the graph can carry; the taxonomy is fixed so views render consistently.
 EDGE_KINDS: tuple[str, ...] = ("http", "grpc", "socket", "event", "package", "co_change", "db")
+
+#: Families in display order.
+EDGE_FAMILIES: tuple[str, ...] = ("runtime", "data", "build", "history")
 
 #: ``match_type`` precedence when several links collapse onto one edge — the most
 #: authoritative wins for display. Higher is stronger.
@@ -98,13 +115,25 @@ MAX_EDGE_REFS = 50
 #: Structural edges assert a real dependency; behavioral (co-change) edges only
 #: assert correlated change. Kept distinct so reachability and the map never
 #: conflate "call each other" with "change together".
-_STRUCTURAL_KINDS: frozenset[str] = frozenset({"http", "grpc", "socket", "event", "package", "db"})
+_STRUCTURAL_KINDS: frozenset[str] = frozenset(
+    kind for kind, family in EDGE_KIND_FAMILY.items() if family != "history"
+)
 
 #: Structural kinds whose dependency is asynchronous: the subscriber depends on
 #: the message shape, not on the publisher answering. Still a dependency (a
 #: cycle through one couples schemas and deploy order), so every view walks it;
 #: this set is what lets a view say which legs of a path are async.
 ASYNC_EDGE_KINDS: frozenset[str] = frozenset({"event"})
+
+
+def edge_family(kind: str) -> str:
+    """The family of an edge *kind*.
+
+    A kind missing from :data:`EDGE_KIND_FAMILY` is ``history``: the builder
+    already treats a kind outside :data:`_STRUCTURAL_KINDS` as non-structural
+    (undirected, never walked), so it is never drawn or grouped as a dependency.
+    """
+    return EDGE_KIND_FAMILY.get(kind, "history")
 
 
 def edge_kind_for_contract_type(contract_type: str) -> str:
@@ -189,12 +218,18 @@ class SystemEdge:
     #: confidence. None on a co-change edge, which no link made.
     strategy: str | None = None
 
+    @property
+    def family(self) -> str:
+        """``runtime`` | ``data`` | ``build`` | ``history``; see :func:`edge_family`."""
+        return edge_family(self.kind)
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "source": self.source,
             "target": self.target,
             "kind": self.kind,
+            "family": self.family,
             "match_type": self.match_type,
             "confidence": self.confidence,
             "weight": self.weight,

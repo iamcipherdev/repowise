@@ -14,7 +14,9 @@ order, each claiming only what the earlier ones left:
    token instead (``acme-billing-*`` inside ``acme-*``), up to
    :data:`MAX_NAME_DEPTH` tokens.
 3. **linked**: community detection over runtime and data edges among the
-   services still ungrouped, labelled by the member most services call.
+   services still ungrouped, labelled by the member most services call. Its
+   id comes from the smallest member id, so a new caller can relabel a linked
+   group but never renames it.
 
 A group is kept only with 2+ members; a lone service falls through to the next
 source and may end ungrouped. Groups are emitted only when they reduce
@@ -42,6 +44,8 @@ if TYPE_CHECKING:
 _log = logging.getLogger("repowise.workspace.grouping")
 
 #: Groups appear only above this many services; a smaller map reads fine flat.
+#: This gate and :data:`MIN_GROUPS` live only here: a view treats a non-empty
+#: ``groups`` list as the answer and never re-derives it.
 MIN_SERVICES_TO_GROUP = 40
 
 #: ...and only when at least this many groups (each 2+ members) form.
@@ -53,10 +57,11 @@ MAX_NAME_FAMILY_SHARE = 0.5
 #: Deepest alias prefix a name family may use (``a``, ``a-b``, ``a-b-c``).
 MAX_NAME_DEPTH = 3
 
-#: Edge kinds the linkage source clusters on: what services call or share at
-#: run time. Package edges fan into library hubs and would pull every service
-#: toward the shared libraries; co-change is correlation, not a dependency.
-LINKAGE_KINDS: frozenset[str] = frozenset({"http", "grpc", "socket", "event", "db"})
+#: Edge families (``SystemEdge.family``) the linkage source clusters on: what
+#: services call or share at run time. Build edges fan into library hubs and
+#: would pull every service toward the shared libraries; history (co-change)
+#: is correlation, not a dependency.
+LINKAGE_FAMILIES: frozenset[str] = frozenset({"runtime", "data"})
 
 #: Linkage is skipped (those services stay ungrouped) past this many linked
 #: service pairs. Louvain is near-linear in edges; at this size it runs well
@@ -78,7 +83,8 @@ _TOKEN = re.compile(r"[A-Za-z0-9]+")
 class ServiceGroup:
     """One group of services: what the map draws as a single card."""
 
-    id: str  # "<source>:<key>", stable across rebuilds of the same estate
+    #: ``tag:<name>``, ``name:<prefix>`` or ``linked:<smallest member id>``.
+    id: str
     label: str
     source: str  # tag | name | linked
     member_count: int
@@ -106,10 +112,11 @@ class ServiceGroup:
 # ---------------------------------------------------------------------------
 
 
-def _declared_name(tags: Iterable[str]) -> str | None:
-    """The repo's declared group: its first non-empty ``group:<name>`` tag.
+def declared_group(tags: Iterable[str]) -> str | None:
+    """The repo's declared service group: its first non-empty ``group:<name>`` tag.
 
-    Names keep their case, as conformance's ``tag:<name>`` matcher does.
+    The prefix matches in any case; the name keeps its own, as conformance's
+    ``tag:<name>`` matcher does. The one reader of the ``group:`` convention.
     """
     for tag in (t.strip() for t in tags if t):
         name = tag[len(_GROUP_TAG_PREFIX) :].strip()
@@ -122,7 +129,7 @@ def _by_tag(nodes: list[SystemNode], repo_tags: Mapping[str, Iterable[str]]) -> 
     """Declared groups of 2+ services."""
     groups: dict[str, list[SystemNode]] = {}
     for node in nodes:
-        name = _declared_name(repo_tags.get(node.repo, ()))
+        name = declared_group(repo_tags.get(node.repo, ()))
         if name is not None:
             groups.setdefault(name, []).append(node)
     return [(f"tag:{name}", name, m) for name, m in sorted(groups.items()) if len(m) >= 2]
@@ -172,10 +179,10 @@ def _by_name(nodes: list[SystemNode], estate_repos: int) -> list[_Found]:
 
 
 def _linkage_pairs(ids: set[str], edges: list[SystemEdge]) -> dict[tuple[str, str], int]:
-    """Summed edge weight per unordered pair of *ids* over :data:`LINKAGE_KINDS`."""
+    """Summed edge weight per unordered pair of *ids* over :data:`LINKAGE_FAMILIES`."""
     pair_weight: dict[tuple[str, str], int] = {}
     for edge in edges:
-        if edge.kind not in LINKAGE_KINDS or edge.source == edge.target:
+        if edge.family not in LINKAGE_FAMILIES or edge.source == edge.target:
             continue
         if edge.source in ids and edge.target in ids:
             pair = (min(edge.source, edge.target), max(edge.source, edge.target))
@@ -201,7 +208,12 @@ def _communities(pair_weight: dict[tuple[str, str], int]) -> list[set[str]]:
 
 
 def _by_linkage(nodes: list[SystemNode], edges: list[SystemEdge]) -> list[_Found]:
-    """Linked communities of 2+ services, each labelled by its most-called member."""
+    """Linked communities of 2+ services.
+
+    Each is labelled by its most-called member, and its id names its smallest
+    member id: the label may move as callers change, the id only when the
+    smallest member leaves the community.
+    """
     by_id = {n.id: n for n in nodes}
     pair_weight = _linkage_pairs(set(by_id), edges)
     if len(pair_weight) > MAX_LINKAGE_PAIRS:
@@ -217,15 +229,15 @@ def _by_linkage(nodes: list[SystemNode], edges: list[SystemEdge]) -> list[_Found
     for community in communities:
         members = [by_id[nid] for nid in sorted(community)]
         anchor = min(members, key=lambda m: (-fan_in.get(m.id, 0), m.name, m.id))
-        found.append((f"linked:{anchor.id}", anchor.name, members))
+        found.append((f"linked:{members[0].id}", anchor.name, members))
     return found
 
 
 def _fan_in(edges: list[SystemEdge]) -> dict[str, int]:
-    """How many distinct services call each service over :data:`LINKAGE_KINDS`."""
+    """How many distinct services call each service over :data:`LINKAGE_FAMILIES`."""
     callers: dict[str, set[str]] = {}
     for edge in edges:
-        if edge.kind in LINKAGE_KINDS and edge.source != edge.target:
+        if edge.family in LINKAGE_FAMILIES and edge.source != edge.target:
             callers.setdefault(edge.target, set()).add(edge.source)
     return {nid: len(sources) for nid, sources in callers.items()}
 

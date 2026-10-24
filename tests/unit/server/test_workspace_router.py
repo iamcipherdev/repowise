@@ -1202,8 +1202,29 @@ class TestGetSystemGraph:
         kinds = {(e["source"], e["target"], e["kind"]) for e in data["edges"]}
         assert ("frontend", "backend", "http") in kinds  # consumer -> provider
         assert ("frontend", "backend", "package") in kinds  # dependent -> dependency
+        assert {(e["kind"], e["family"]) for e in data["edges"]} == {
+            ("http", "runtime"),
+            ("package", "build"),
+        }
         assert data["groups"] == []  # two services: too few to group
         assert {n["group"] for n in data["nodes"]} == {None}
+
+    @pytest.mark.asyncio
+    async def test_fills_family_on_an_older_artifact(self, tmp_path: Path) -> None:
+        _make_system_graph_enricher(tmp_path)
+        path = tmp_path / "system_graph.json"
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        for edge in raw["edges"]:
+            del edge["family"]
+        _write_json(path, raw)
+        enricher = CrossRepoEnricher(tmp_path / "cross_repo_edges.json", system_graph_path=path)
+        app = _make_workspace_app(ws_config=_make_ws_config(), enricher=enricher)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            data = (await c.get("/api/workspace/system-graph")).json()
+        assert {(e["kind"], e["family"]) for e in data["edges"]} == {
+            ("http", "runtime"),
+            ("package", "build"),
+        }
 
     @pytest.mark.asyncio
     async def test_returns_service_groups(self, tmp_path: Path) -> None:

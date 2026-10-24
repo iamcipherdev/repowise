@@ -4886,6 +4886,7 @@ export interface WorkspaceSystemEdge {
   structural?: boolean;
   contract_refs?: string[];
   strategy?: string | null;
+  family?: string | null;
 }
 
 export interface WorkspaceSystemGraphResponse {

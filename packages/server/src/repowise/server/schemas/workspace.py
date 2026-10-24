@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class WorkspaceRepoRemovedResponse(BaseModel):
@@ -285,6 +285,17 @@ class WorkspaceSystemEdge(BaseModel):
     #: Strategy of the link that gave the edge its confidence (``manifest`` on
     #: a package edge); None on a co-change edge.
     strategy: str | None = None
+    #: runtime | data | build | history, from core's one kind-to-family table.
+    #: Filled from ``kind`` for an artifact written before edges carried it.
+    family: str | None = None
+
+    @model_validator(mode="after")
+    def _fill_family(self) -> WorkspaceSystemEdge:
+        if self.family is None:
+            from repowise.core.workspace.system_graph import edge_family
+
+            self.family = edge_family(self.kind)
+        return self
 
 
 class WorkspaceRepoDiagnostics(BaseModel):
