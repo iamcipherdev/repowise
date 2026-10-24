@@ -112,9 +112,9 @@ def _declared_name(tags: Iterable[str]) -> str | None:
     Names keep their case, as conformance's ``tag:<name>`` matcher does.
     """
     for tag in (t.strip() for t in tags if t):
-        if tag.lower().startswith(_GROUP_TAG_PREFIX):
-            if name := tag[len(_GROUP_TAG_PREFIX) :].strip():
-                return name
+        name = tag[len(_GROUP_TAG_PREFIX) :].strip()
+        if tag.lower().startswith(_GROUP_TAG_PREFIX) and name:
+            return name
     return None
 
 
