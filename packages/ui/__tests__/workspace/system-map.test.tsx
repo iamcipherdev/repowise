@@ -458,6 +458,13 @@ describe("SystemMap chrome placement", () => {
     expect(onPhase.mock.calls.map(([p]) => p)).toEqual(["aggregate", "layout", "paint"]);
   });
 
+  it("reports no phase when there is no graph to lay out", async () => {
+    const onPhase = vi.fn();
+    render(<SystemMap graph={null} error={new Error("boom")} onPhase={onPhase} />);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(onPhase).not.toHaveBeenCalled();
+  });
+
   it("reports layout only once the new graph's layout has run", async () => {
     const onPhase = vi.fn();
     const { rerender } = render(<SystemMap graph={g} onPhase={onPhase} />);

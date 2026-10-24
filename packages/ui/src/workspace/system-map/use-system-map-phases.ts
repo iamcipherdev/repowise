@@ -24,6 +24,8 @@ export function useSystemMapPhases(
   const notify = useRef(onPhase);
   notify.current = onPhase;
   const wasLoading = useRef(layoutLoading);
+  const drawn = useRef(viewGraph);
+  drawn.current = viewGraph;
 
   useEffect(() => {
     if (viewGraph) notify.current?.("aggregate");
@@ -31,9 +33,10 @@ export function useSystemMapPhases(
 
   // Keyed on the loading flag falling, not on the view graph: the layout hook
   // raises it a commit after a new graph arrives, so the graph alone would
-  // report a layout that has not run yet.
+  // report a layout that has not run yet. A null or empty graph clears the
+  // flag without a run, so it reports nothing.
   useEffect(() => {
-    const settled = wasLoading.current && !layoutLoading;
+    const settled = wasLoading.current && !layoutLoading && (drawn.current?.nodes.length ?? 0) > 0;
     wasLoading.current = layoutLoading;
     if (!settled || !notify.current) return;
     notify.current("layout");
