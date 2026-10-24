@@ -1219,7 +1219,7 @@ class TestGetSystemGraph:
         assert [n["id"] for n in lean["nodes"]] == [n["id"] for n in full["nodes"]]
         assert [e["id"] for e in lean["edges"]] == [e["id"] for e in full["edges"]]
         http = next(e for e in lean["edges"] if e["kind"] == "http")
-        assert "contract_refs" not in http
+        assert http["contract_refs"] is None
         assert http["ref_count"] == 1
 
     @pytest.mark.asyncio

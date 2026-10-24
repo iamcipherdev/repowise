@@ -174,8 +174,6 @@ export interface SystemNode {
   is_orphan_consumer: boolean;
   /** Participates in no edges. */
   is_isolated: boolean;
-  /** The system the service belongs to, when the graph assigns one. */
-  group?: string | null;
 }
 
 /** A typed, directed relationship between two services (`source` → `target`). */
@@ -192,9 +190,9 @@ export interface SystemEdge {
   structural: boolean;
   /**
    * Back-pointers to the underlying evidence, for drill-down (bounded). The
-   * map's lean view (`?view=map`) omits them on structural edges.
+   * map's lean view (`?view=map`) sends null on structural edges.
    */
-  contract_refs?: string[];
+  contract_refs?: string[] | null;
   /** Distinct refs the full edge keeps; set by the lean view in place of the list. */
   ref_count?: number;
   /** Strategy of the link that gave the edge its confidence; null on a co-change edge. */

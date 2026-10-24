@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
 
 from repowise.core.analysis.external_systems.links import IMPORT_TARGET_LANGUAGES
 from repowise.core.docs_mode import resolve_docs_mode
@@ -44,6 +43,7 @@ from repowise.server.schemas import (
     WorkspaceRepoRemovedResponse,
     WorkspaceResponse,
     WorkspaceSyncResponse,
+    WorkspaceSystemGraphMapResponse,
     WorkspaceSystemGraphResponse,
     WorkspaceTestImpactResponse,
 )
@@ -515,7 +515,10 @@ async def get_workspace_graph(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/system-graph", response_model=WorkspaceSystemGraphResponse)
+@router.get(
+    "/system-graph",
+    response_model=WorkspaceSystemGraphResponse | WorkspaceSystemGraphMapResponse,
+)
 async def get_system_graph(
     ws_config=Depends(get_workspace_config),
     enricher=Depends(get_cross_repo_enricher),
@@ -540,7 +543,7 @@ async def get_system_graph(
     if view == "map":
         from repowise.core.workspace.system_map_view import lean_system_graph
 
-        return JSONResponse(lean_system_graph(graph or {}))
+        return WorkspaceSystemGraphMapResponse(**lean_system_graph(graph or {}))
     if not graph:
         return WorkspaceSystemGraphResponse()
     return WorkspaceSystemGraphResponse(**graph)
