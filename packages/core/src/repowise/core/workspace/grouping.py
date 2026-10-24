@@ -4,8 +4,9 @@ A map of 300 services is a wall of cards. Grouping gives it a first level to
 read: each service joins at most one group, found by three sources in priority
 order, each claiming only what the earlier ones left:
 
-1. **tag**: the repo declares it in ``.repowise-workspace.yaml``. A
-   ``group:<name>`` tag wins; otherwise the repo's first tag.
+1. **tag**: the repo declares a ``group:<name>`` tag in
+   ``.repowise-workspace.yaml``. Other tags (``backend``, ``team:x``) serve
+   conformance rules and never make a group.
 2. **name**: a shared leading name of repo aliases (``ordering.api``,
    ``ordering.worker`` -> ``ordering``), kept only when it spans 2+ repos and
    under half the estate's repos. A prefix that covers half the estate is an
@@ -106,18 +107,15 @@ class ServiceGroup:
 
 
 def _declared_name(tags: Iterable[str]) -> str | None:
-    """The repo's declared group: a ``group:<name>`` tag, else its first other tag.
+    """The repo's declared group: its first non-empty ``group:<name>`` tag.
 
     Names keep their case, as conformance's ``tag:<name>`` matcher does.
     """
-    plain: list[str] = []
     for tag in (t.strip() for t in tags if t):
         if tag.lower().startswith(_GROUP_TAG_PREFIX):
             if name := tag[len(_GROUP_TAG_PREFIX) :].strip():
                 return name
-        elif tag:
-            plain.append(tag)
-    return plain[0] if plain else None
+    return None
 
 
 def _by_tag(nodes: list[SystemNode], repo_tags: Mapping[str, Iterable[str]]) -> list[_Found]:

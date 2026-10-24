@@ -75,30 +75,35 @@ def test_eshop_sized_estate_stays_flat():
 # ---------------------------------------------------------------------------
 
 
-def test_declared_group_tag_wins_over_first_tag_and_name():
-    nodes = [_node(a) for a in ("api-a", "api-b", "web-a", "web-b")] + _filler(40)
+def test_only_a_group_tag_declares_a_group():
+    nodes = [_node(a) for a in ("api-a", "api-b", "web-a", "web-b", "job", "cron")]
+    nodes += _filler(40)
     tags = {
         "api-a": ["edge", "group:checkout"],
         "web-a": ["group:checkout"],
-        "api-b": ["payments"],
-        "web-b": ["payments", "legacy"],
+        "api-b": ["backend", "Group: Billing"],
+        "web-b": ["group:Billing", "legacy"],
+        # Conformance tags shared by two repos never make a group.
+        "job": ["backend", "python"],
+        "cron": ["backend", "python"],
     }
     assignment, groups = group_services(nodes, [], tags)
     assert assignment == {
         "api-a": "tag:checkout",
         "web-a": "tag:checkout",
-        "api-b": "tag:payments",
-        "web-b": "tag:payments",
+        "api-b": "tag:Billing",
+        "web-b": "tag:Billing",
     }
     assert {(g.id, g.label, g.source, g.member_count) for g in groups} == {
         ("tag:checkout", "checkout", "tag", 2),
-        ("tag:payments", "payments", "tag", 2),
+        ("tag:Billing", "Billing", "tag", 2),
     }
 
 
-def test_declared_name_ignores_an_empty_group_tag():
-    assert grouping._declared_name(["group:", " web "]) == "web"
-    assert grouping._declared_name(["group:"]) is None
+def test_declared_name_reads_only_group_tags():
+    assert grouping._declared_name(["group:", " web "]) is None
+    assert grouping._declared_name(["backend"]) is None
+    assert grouping._declared_name(["group:", "group: core "]) == "core"
     assert grouping._declared_name(["edge", "Group: Checkout"]) == "Checkout"
     assert grouping._declared_name([]) is None
 
@@ -187,7 +192,7 @@ def _mixed_estate() -> tuple[list[SystemNode], list[SystemEdge], dict[str, list[
         _edge(f"solo{i:03d}", f"solo{(i * 7 + 3) % 60:03d}", "http", weight=i % 4 + 1)
         for i in range(60)
     ]
-    tags = {"solo001": ["group:core"], "solo002": ["core"]}
+    tags = {"solo001": ["group:core"], "solo002": ["team:x", "group:core"]}
     return nodes, edges, tags
 
 

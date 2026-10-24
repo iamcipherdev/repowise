@@ -52,8 +52,8 @@ class RepoEntry:
     # Free-form labels (e.g. "frontend", "tier:edge", "legacy") that group repos
     # for architecture conformance rules. A rule like ``frontend !-> db`` matches
     # by tag via ``tag:<name>``; every service node in this repo inherits these.
-    # On a large estate a ``group:<name>`` tag (else the first tag) also names
-    # the system the repo's services are grouped under (see ``grouping.py``).
+    # On a large estate a ``group:<name>`` tag also names the system the repo's
+    # services are grouped under (see ``grouping.py``); other tags never do.
     tags: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
