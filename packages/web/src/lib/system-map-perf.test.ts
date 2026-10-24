@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { markSystemMap, observeLongTasks } from "./system-map-perf";
+import { SYSTEM_MAP_PERF_CAP, markSystemMap, observeLongTasks } from "./system-map-perf";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -12,6 +12,13 @@ describe("system map performance marks", () => {
     markSystemMap("data");
     markSystemMap("paint");
     expect(performance.getEntriesByType("mark").map((m) => m.name)).toEqual(["sm:data", "sm:paint"]);
+  });
+
+  it("keeps each mark name under the cap", () => {
+    for (let i = 0; i < SYSTEM_MAP_PERF_CAP * 2 + 5; i++) markSystemMap("layout");
+    markSystemMap("data");
+    expect(performance.getEntriesByName("sm:layout").length).toBeLessThanOrEqual(SYSTEM_MAP_PERF_CAP);
+    expect(performance.getEntriesByName("sm:data")).toHaveLength(1);
   });
 
   it("is a no-op where long tasks cannot be observed", () => {
@@ -37,6 +44,8 @@ describe("system map performance marks", () => {
     const measures = performance.getEntriesByName("sm:longtask");
     expect(measures).toHaveLength(1);
     expect(measures[0]!.duration).toBe(75);
+    deliver(Array.from({ length: SYSTEM_MAP_PERF_CAP * 2 }, (_, i) => ({ startTime: i, duration: 60 })));
+    expect(performance.getEntriesByName("sm:longtask").length).toBeLessThanOrEqual(SYSTEM_MAP_PERF_CAP);
     stop();
     expect(disconnect).toHaveBeenCalled();
   });
