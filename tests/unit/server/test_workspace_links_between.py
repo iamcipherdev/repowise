@@ -24,11 +24,22 @@ def _enricher(tmp_path: Path) -> CrossRepoEnricher:
             "contracts": data["contracts"],
             "contract_links": data["contract_links"],
             "service_links": data["service_links"],
+            "repo_provenance": data["repo_provenance"],
         },
     )
     _write_json(
+        tmp_path / "cross_repo_edges.json",
+        {"version": 2, "package_deps": data["package_deps"], "co_changes": data["co_changes"]},
+    )
+    _write_json(
         tmp_path / "system_graph.json",
-        {"version": 2, "nodes": data["nodes"], "edges": [], "diagnostics": {}},
+        {
+            "version": 2,
+            "nodes": data["nodes"],
+            "edges": [],
+            "diagnostics": {},
+            "repo_provenance": data["repo_provenance"],
+        },
     )
     return CrossRepoEnricher(
         tmp_path / "cross_repo_edges.json",
@@ -54,14 +65,25 @@ async def test_pages_the_links_between_two_services(tmp_path: Path) -> None:
     row = data["links"][0]
     assert row["direction"] == "a_to_b"
     assert row["kind"] == "event"
-    assert row["strategy"] == "exact_id"
+    assert row["link"]["strategy"] == "exact_id"
+    assert data["stale_graph"] is False
 
 
 @pytest.mark.asyncio
 async def test_gateway_service_link_is_served(tmp_path: Path) -> None:
     app = _make_workspace_app(ws_config=_make_ws_config(), enricher=_enricher(tmp_path))
     data = (await _get(app, a="webapp", b="catalog.api", kind="http")).json()
-    assert "gateway_route" in {lk["strategy"] for lk in data["links"]}
+    assert "gateway_route" in {row["link"]["strategy"] for row in data["links"]}
+
+
+@pytest.mark.asyncio
+async def test_package_dependency_rows_are_served(tmp_path: Path) -> None:
+    app = _make_workspace_app(ws_config=_make_ws_config(), enricher=_enricher(tmp_path))
+    data = (await _get(app, a="webapp", b="eventbusrabbitmq")).json()
+    assert data["total"] == 1
+    row = data["links"][0]
+    assert (row["evidence"], row["kind"], row["direction"]) == ("package", "package", "a_to_b")
+    assert row["package_dep"]["target_repo"] == "eventbusrabbitmq"
 
 
 @pytest.mark.asyncio

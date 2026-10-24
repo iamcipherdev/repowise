@@ -610,41 +610,33 @@ async def get_links_between(
     enricher=Depends(get_cross_repo_enricher),
     a: str = Query(..., description="A service node id ('repo' or 'repo::service/path')."),
     b: str = Query(..., description="The other service node id."),
-    kind: str | None = Query(None, description="One edge kind: http, grpc, event, db..."),
+    kind: str | None = Query(
+        None, description="One edge kind: http, grpc, event, db, package, co_change..."
+    ),
     q: str | None = Query(
         None,
-        description="Every whitespace-separated term must match the link's ids, files or symbols.",
+        description="Every whitespace-separated term must match the row's ids, files, symbols or packages.",
     ),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ):
-    """Every contract link between two services, both directions, paged.
+    """Everything behind the edges between two services, both directions, paged.
 
-    Each end is resolved to its service the way the system graph was built,
-    so the rows are exactly the links behind the edges drawn between the two.
-    404 when either id is not a node of the graph (or no graph is built).
+    Contract links, service links, package dependencies and co-changes, each
+    end resolved to its service the way the system graph was built, so a
+    pair's rows add up to its edges' weights. The graph, contracts and
+    cross-repo artifacts are read as one build; ``stale_graph`` flags a graph
+    whose repo heads differ from the contracts'. 404 when either id is not a
+    node of the graph (or no graph is built).
     """
     _require_workspace(ws_config)
 
     from repowise.core.workspace.links_between import links_between
 
-    graph = enricher.get_system_graph() if enricher is not None else None
+    index = enricher.links_index() if enricher is not None else None
     result = (
-        links_between(
-            graph.get("nodes", []),
-            {
-                "contracts": enricher.contracts,
-                "contract_links": enricher.contract_links,
-                "service_links": enricher.service_links,
-            },
-            a=a,
-            b=b,
-            kind=kind,
-            q=q,
-            limit=limit,
-            offset=offset,
-        )
-        if graph
+        links_between(index, a=a, b=b, kind=kind, q=q, limit=limit, offset=offset)
+        if index is not None
         else None
     )
     if result is None:

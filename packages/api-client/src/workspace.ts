@@ -127,16 +127,17 @@ export async function getWorkspaceSystemGraph(
 }
 
 /**
- * Every link between two service nodes, both directions, one page at a time.
+ * Everything behind the edges between two service nodes (contract links,
+ * package dependencies, co-changes), both directions, one page at a time.
  * Each end is resolved to its service server-side, the way the graph was built.
  */
 export async function getWorkspaceLinksBetween(
   opts: {
     a: string;
     b: string;
-    /** One edge kind: `http`, `grpc`, `event`, `db`... */
+    /** One edge kind: `http`, `grpc`, `event`, `db`, `package`, `co_change`... */
     kind?: string;
-    /** Every whitespace-separated term must match the link's ids, files or symbols. */
+    /** Every whitespace-separated term must match the row's ids, files, symbols or packages. */
     q?: string;
     limit?: number;
     offset?: number;

@@ -873,5 +873,198 @@
    "consumer_symbol": "/product-images/** -> ?",
    "strategy": "gateway_route"
   }
- ]
+ ],
+ "package_deps": [
+  {
+   "source_repo": "ordering.api",
+   "target_repo": "eshop.servicedefaults",
+   "source_manifest": "Ordering.API.csproj",
+   "kind": "dotnet_project_ref",
+   "target_package": "",
+   "target_manifest": "",
+   "requested_version": null,
+   "scope": "",
+   "resolution_basis": ""
+  },
+  {
+   "source_repo": "ordering.api",
+   "target_repo": "eventbusrabbitmq",
+   "source_manifest": "Ordering.API.csproj",
+   "kind": "dotnet_project_ref",
+   "target_package": "",
+   "target_manifest": "",
+   "requested_version": null,
+   "scope": "",
+   "resolution_basis": ""
+  },
+  {
+   "source_repo": "ordering.api",
+   "target_repo": "integrationeventlogef",
+   "source_manifest": "Ordering.API.csproj",
+   "kind": "dotnet_project_ref",
+   "target_package": "",
+   "target_manifest": "",
+   "requested_version": null,
+   "scope": "",
+   "resolution_basis": ""
+  },
+  {
+   "source_repo": "ordering.api",
+   "target_repo": "ordering.domain",
+   "source_manifest": "Ordering.API.csproj",
+   "kind": "dotnet_project_ref",
+   "target_package": "",
+   "target_manifest": "",
+   "requested_version": null,
+   "scope": "",
+   "resolution_basis": ""
+  },
+  {
+   "source_repo": "ordering.api",
+   "target_repo": "ordering.infrastructure",
+   "source_manifest": "Ordering.API.csproj",
+   "kind": "dotnet_project_ref",
+   "target_package": "",
+   "target_manifest": "",
+   "requested_version": null,
+   "scope": "",
+   "resolution_basis": ""
+  },
+  {
+   "source_repo": "webapp",
+   "target_repo": "eshop.servicedefaults",
+   "source_manifest": "WebApp.csproj",
+   "kind": "dotnet_project_ref",
+   "target_package": "",
+   "target_manifest": "",
+   "requested_version": null,
+   "scope": "",
+   "resolution_basis": ""
+  },
+  {
+   "source_repo": "webapp",
+   "target_repo": "eventbusrabbitmq",
+   "source_manifest": "WebApp.csproj",
+   "kind": "dotnet_project_ref",
+   "target_package": "",
+   "target_manifest": "",
+   "requested_version": null,
+   "scope": "",
+   "resolution_basis": ""
+  },
+  {
+   "source_repo": "webapp",
+   "target_repo": "webappcomponents",
+   "source_manifest": "WebApp.csproj",
+   "kind": "dotnet_project_ref",
+   "target_package": "",
+   "target_manifest": "",
+   "requested_version": null,
+   "scope": "",
+   "resolution_basis": ""
+  }
+ ],
+ "co_changes": [],
+ "repo_provenance": {
+  "basket.api": {
+   "head": "b80aab99f422cc5711d55f6d840d96400cc95fe0",
+   "extracted_at": "2026-10-23T20:58:09.942554+00:00",
+   "config_fp": "f02e1ebcb01fe3f4"
+  },
+  "catalog.api": {
+   "head": "fe49004bed18e00396912f3572ebbdbf7bcab6e8",
+   "extracted_at": "2026-10-23T20:58:09.942554+00:00",
+   "config_fp": "f02e1ebcb01fe3f4"
+  },
+  "clientapp": {
+   "head": "b67e31c1190c94d4b1e93e35ee5b7f6ac3c76129",
+   "extracted_at": "2026-10-23T20:58:09.942554+00:00",
+   "config_fp": "f02e1ebcb01fe3f4"
+  },
+  "eshop.apphost": {
+   "head": "2b8bd2d54ba695f00bc3cc9bc1a6e03a008dbf42",
+   "extracted_at": "2026-10-23T20:58:09.942554+00:00",
+   "config_fp": "f02e1ebcb01fe3f4"
+  },
+  "eshop.servicedefaults": {
+   "head": "d86fcfbeaeaa2c295925c9f20d089fcaf3b9d37a",
+   "extracted_at": "2026-10-23T20:58:09.942554+00:00",
+   "config_fp": "f02e1ebcb01fe3f4"
+  },
+  "eventbus": {
+   "head": "d43cbc98a852e11efe167683bce8ff9d64329fdf",
+   "extracted_at": "2026-10-23T20:58:09.942554+00:00",
+   "config_fp": "f02e1ebcb01fe3f4"
+  },
+  "eventbusrabbitmq": {
+   "head": "d69fed8205360a6fedd99e9250f76874884ee286",
+   "extracted_at": "2026-10-23T20:58:09.942554+00:00",
+   "config_fp": "f02e1ebcb01fe3f4"
+  },
+  "hybridapp": {
+   "head": "c6118241f772f53806f4b6852d9bc6e4dfd89c5e",
+   "extracted_at": "2026-10-23T20:58:09.942554+00:00",
+   "config_fp": "f02e1ebcb01fe3f4"
+  },
+  "identity.api": {
+   "head": "9d01ff7bd729d2c62e37c69763c2768fa2338af1",
+   "extracted_at": "2026-10-23T20:58:09.942554+00:00",
+   "config_fp": "f02e1ebcb01fe3f4"
+  },
+  "integrationeventlogef": {
+   "head": "34290a1c3e5b2bd143d7f24e57e6160eb8968df7",
+   "extracted_at": "2026-10-23T20:58:09.942554+00:00",
+   "config_fp": "f02e1ebcb01fe3f4"
+  },
+  "ordering.api": {
+   "head": "d079a9e8537ae2e65d1bcc2f7c28cf90709bae15",
+   "extracted_at": "2026-10-23T20:58:09.942554+00:00",
+   "config_fp": "f02e1ebcb01fe3f4"
+  },
+  "ordering.domain": {
+   "head": "6ba73fe5d31ea6caac91c0f021116d3d80fc5614",
+   "extracted_at": "2026-10-23T20:58:09.942554+00:00",
+   "config_fp": "f02e1ebcb01fe3f4"
+  },
+  "ordering.infrastructure": {
+   "head": "b349083becc2c4fd315005fd0a4ae55533601771",
+   "extracted_at": "2026-10-23T20:58:09.942554+00:00",
+   "config_fp": "f02e1ebcb01fe3f4"
+  },
+  "orderprocessor": {
+   "head": "aaede1f5fdc096b290ef4cbab2147eddf1f962db",
+   "extracted_at": "2026-10-23T20:58:09.942554+00:00",
+   "config_fp": "f02e1ebcb01fe3f4"
+  },
+  "paymentprocessor": {
+   "head": "d50e1e0cae8a98a418ab5a26d77a0510c5876024",
+   "extracted_at": "2026-10-23T20:58:09.942554+00:00",
+   "config_fp": "f02e1ebcb01fe3f4"
+  },
+  "shared": {
+   "head": "9d9684e0c43cd77de1948f1616c0513fedf61fb0",
+   "extracted_at": "2026-10-23T20:58:09.942554+00:00",
+   "config_fp": "f02e1ebcb01fe3f4"
+  },
+  "webapp": {
+   "head": "16ee25205ae8aa76461f9019ebee854d49dc372e",
+   "extracted_at": "2026-10-23T20:58:09.942554+00:00",
+   "config_fp": "f02e1ebcb01fe3f4"
+  },
+  "webappcomponents": {
+   "head": "2d404794ee49793cb4bddafde3a03bc7c0e6f653",
+   "extracted_at": "2026-10-23T20:58:09.942554+00:00",
+   "config_fp": "f02e1ebcb01fe3f4"
+  },
+  "webhookclient": {
+   "head": "47c67aa9895dd2375ac1cb8e7bef2f2caef53ea5",
+   "extracted_at": "2026-10-23T20:58:09.942554+00:00",
+   "config_fp": "f02e1ebcb01fe3f4"
+  },
+  "webhooks.api": {
+   "head": "41e0f14fc5c930ebf08ee83c3577fd78ad3b93b2",
+   "extracted_at": "2026-10-23T20:58:09.942554+00:00",
+   "config_fp": "f02e1ebcb01fe3f4"
+  }
+ }
 }

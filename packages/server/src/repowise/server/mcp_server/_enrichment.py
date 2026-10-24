@@ -130,6 +130,9 @@ class CrossRepoEnricher:
         # Read once per loaded graph: its evidence brief and parsed diagnostics.
         self._evidence_brief: Any = _ABSENT
         self._parsed_diagnostics: Any = _ABSENT
+        # Every link resolved to its service pair, built on the first
+        # links-between read and dropped with the artifacts it was built from.
+        self._links_index: Any = None
 
         # Provider changes from the latest update that break consumers, with the
         # impacted consumer files. Read-only.
@@ -499,6 +502,29 @@ class CrossRepoEnricher:
     def get_system_graph(self) -> dict | None:
         """Return the raw system graph dict (nodes, edges, diagnostics)."""
         return self._system_graph
+
+    def links_index(self) -> Any:
+        """The loaded artifacts' :class:`~repowise.core.workspace.links_between.LinksIndex`.
+
+        None without a system graph. Built once, so paging a pair never
+        rescans the estate's links.
+        """
+        if self._system_graph is None:
+            return None
+        if self._links_index is None:
+            from repowise.core.workspace.links_between import build_links_index
+
+            self._links_index = build_links_index(
+                self._system_graph,
+                {
+                    "contracts": self._contracts,
+                    "contract_links": self._contract_links,
+                    "service_links": self._service_links,
+                    "repo_provenance": self._contract_analysis.get("repo_provenance"),
+                },
+                {"package_deps": self._package_deps, "co_changes": self._co_changes},
+            )
+        return self._links_index
 
     @property
     def has_breaking_changes(self) -> bool:

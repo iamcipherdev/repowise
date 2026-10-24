@@ -245,6 +245,7 @@ export type {
   SystemEdgeMatchType,
   ServiceLinkDirection,
   ServiceLinkEntry,
+  ServiceLinkEvidence,
   ServiceLinksTotal,
   ServiceLinksBetween,
   ExtractionDiagnostics,

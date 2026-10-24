@@ -156,37 +156,6 @@ class WorkspaceContractsResponse(BaseModel):
     by_type: dict[str, int] = {}
 
 
-class WorkspaceServiceLinkEntry(WorkspaceContractLinkEntry):
-    """One link between two services, as ``GET /system-graph/links`` pages them."""
-
-    #: The system-graph edge kind the link folds into (``http``, ``event``, ``db``...).
-    kind: str
-    #: ``a_to_b`` when service ``a`` is the consumer, ``b_to_a`` when ``b`` is.
-    direction: Literal["a_to_b", "b_to_a"]
-    #: What established each end's contract (``route_registration``,
-    #: ``client_call``...), one of ``repowise.core.workspace.origins``. None
-    #: when that end has no stored contract row or predates origins.
-    provider_origin: str | None = None
-    consumer_origin: str | None = None
-
-
-class WorkspaceServiceLinksTotal(BaseModel):
-    kind: str
-    direction: Literal["a_to_b", "b_to_a"]
-    count: int
-
-
-class WorkspaceLinksBetweenResponse(BaseModel):
-    a: str
-    b: str
-    #: One page of links, ordered by direction, kind, contract id, then file.
-    links: list[WorkspaceServiceLinkEntry]
-    #: Links matching every filter; the page is cut from these.
-    total: int
-    #: Links per kind and direction under ``q`` but not ``kind``.
-    totals: list[WorkspaceServiceLinksTotal]
-
-
 class WorkspaceContractDetail(BaseModel):
     """One contract, keyed by ``(repo, file_path, contract_id)``.
 
@@ -216,6 +185,70 @@ class WorkspaceCoChangeEntry(BaseModel):
     strength: float
     frequency: int
     last_date: str
+
+
+class WorkspacePackageDepEntry(BaseModel):
+    """One manifest dependency of one repo on another, as ``cross_repo_edges.json`` stores it."""
+
+    source_repo: str
+    source_manifest: str = ""
+    target_repo: str
+    target_package: str = ""
+    #: How the dependency resolved (``npm_package``, ``dotnet_project_ref``...).
+    kind: str = ""
+    target_manifest: str = ""
+    requested_version: str | None = None
+    scope: str = ""
+    resolution_basis: str = ""
+
+
+class WorkspaceServiceLinkEntry(BaseModel):
+    """One piece of evidence behind an edge between two services.
+
+    ``evidence`` says which of ``link``, ``package_dep`` or ``co_change`` is set.
+    """
+
+    #: The system-graph edge kind it folds into (``http``, ``event``, ``db``,
+    #: ``package``, ``co_change``...).
+    kind: str
+    #: ``a_to_b`` when service ``a`` is the consumer or dependent, ``b_to_a``
+    #: when ``b`` is, ``both`` for a co-change (it has no direction).
+    direction: Literal["a_to_b", "b_to_a", "both"]
+    evidence: Literal["contract", "package", "co_change"]
+    #: A contract link or service link (host-only, gateway route).
+    link: WorkspaceContractLinkEntry | None = None
+    #: What established each end's contract (``route_registration``,
+    #: ``client_call``...), one of ``repowise.core.workspace.origins``. None
+    #: when that end has no stored contract row or predates origins.
+    provider_origin: str | None = None
+    consumer_origin: str | None = None
+    package_dep: WorkspacePackageDepEntry | None = None
+    co_change: WorkspaceCoChangeEntry | None = None
+
+
+class WorkspaceServiceLinksTotal(BaseModel):
+    kind: str
+    direction: Literal["a_to_b", "b_to_a", "both"]
+    count: int
+
+
+class WorkspaceLinksBetweenResponse(BaseModel):
+    """Links between two services, read from ``system_graph.json``, ``contracts.json``
+    and ``cross_repo_edges.json``. The three are written together by one
+    workspace update; ``stale_graph`` is true when the graph and the contracts
+    record different repo heads, and rows may then be missing."""
+
+    a: str
+    b: str
+    stale_graph: bool = False
+    #: One page of rows, ordered by direction, kind, evidence, then ids and files.
+    links: list[WorkspaceServiceLinkEntry]
+    #: Rows matching every filter; the page is cut from these.
+    total: int
+    #: Rows per edge kind and direction, for every kind present, under ``q``
+    #: but not ``kind``. Kinds are not grouped here: a view that shows kind
+    #: families (runtime, data, build, history) sums them itself.
+    totals: list[WorkspaceServiceLinksTotal]
 
 
 class WorkspaceCoChangesResponse(BaseModel):

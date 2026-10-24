@@ -111,20 +111,34 @@ export interface WorkspaceContractLinkEntry {
   consumer_contract_id?: string | null;
 }
 
-/** Which way a link between two services runs: `a_to_b` when `a` is the consumer. */
-export type ServiceLinkDirection = "a_to_b" | "b_to_a";
+/**
+ * Which way a link between two services runs: `a_to_b` when `a` is the consumer
+ * or dependent, `both` for a co-change (it has no direction).
+ */
+export type ServiceLinkDirection = "a_to_b" | "b_to_a" | "both";
+
+/** What a row between two services is: which of its payload fields is set. */
+export type ServiceLinkEvidence = "contract" | "package" | "co_change";
 
 /**
- * One link between two services, each end resolved to its service the way the
- * system graph was built. Mirrors `repowise.core.workspace.links_between`.
+ * One piece of evidence behind an edge between two services, each end resolved
+ * to its service the way the system graph was built. Mirrors
+ * `repowise.core.workspace.links_between`.
  */
-export interface ServiceLinkEntry extends WorkspaceContractLinkEntry {
-  /** The system-graph edge kind the link folds into. */
+export interface ServiceLinkEntry {
+  /** The system-graph edge kind it folds into. */
   kind: SystemEdgeKind | (string & {});
   direction: ServiceLinkDirection;
+  evidence: ServiceLinkEvidence;
+  /** Set when `evidence` is `contract`: a contract link or service link. */
+  link?: WorkspaceContractLinkEntry | null;
   /** What established each end's contract; null when unknown. */
   provider_origin?: ContractOriginWire | null;
   consumer_origin?: ContractOriginWire | null;
+  /** Set when `evidence` is `package`. */
+  package_dep?: WorkspacePackageDepEntry | null;
+  /** Set when `evidence` is `co_change`. */
+  co_change?: WorkspaceCoChangeEntry | null;
 }
 
 export interface ServiceLinksTotal {
@@ -133,15 +147,20 @@ export interface ServiceLinksTotal {
   count: number;
 }
 
-/** `GET /api/workspace/system-graph/links`: one page of links between `a` and `b`. */
+/** `GET /api/workspace/system-graph/links`: one page of rows between `a` and `b`. */
 export interface ServiceLinksBetween {
   a: string;
   b: string;
-  /** Ordered by direction, kind, contract id, then file. */
+  /** The graph and the contracts record different repo heads; rows may be missing. */
+  stale_graph?: boolean;
+  /** Ordered by direction, kind, evidence, then ids and files. */
   links: ServiceLinkEntry[];
-  /** Links matching every filter; the page is cut from these. */
+  /** Rows matching every filter; the page is cut from these. */
   total: number;
-  /** Links per kind and direction under `q` but not `kind`. */
+  /**
+   * Rows per edge kind and direction, for every kind present, under `q` but not
+   * `kind`. Not grouped: a view showing kind families sums them itself.
+   */
   totals: ServiceLinksTotal[];
 }
 
