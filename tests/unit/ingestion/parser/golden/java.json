@@ -33,7 +33,9 @@
         "type_parameter_count": null,
         "extension_receiver": null,
         "written_receiver": null,
-        "modifiers": [],
+        "modifiers": [
+          "public"
+        ],
         "alias_of": null
       },
       {
@@ -56,7 +58,9 @@
         "type_parameter_count": null,
         "extension_receiver": null,
         "written_receiver": null,
-        "modifiers": [],
+        "modifiers": [
+          "public"
+        ],
         "alias_of": null
       },
       {
@@ -79,7 +83,9 @@
         "type_parameter_count": null,
         "extension_receiver": null,
         "written_receiver": null,
-        "modifiers": [],
+        "modifiers": [
+          "public"
+        ],
         "alias_of": null
       },
       {
@@ -102,7 +108,9 @@
         "type_parameter_count": null,
         "extension_receiver": null,
         "written_receiver": null,
-        "modifiers": [],
+        "modifiers": [
+          "public"
+        ],
         "alias_of": null
       }
     ],
@@ -484,6 +492,7 @@
             "is_module_alias": false,
             "is_global": false,
             "is_static_import": false,
+            "member_of": null,
             "line": null,
             "column": null
           }
@@ -509,6 +518,7 @@
             "is_module_alias": false,
             "is_global": false,
             "is_static_import": false,
+            "member_of": null,
             "line": null,
             "column": null
           }
@@ -534,6 +544,7 @@
             "is_module_alias": false,
             "is_global": false,
             "is_static_import": false,
+            "member_of": null,
             "line": null,
             "column": null
           }
@@ -559,6 +570,7 @@
             "is_module_alias": false,
             "is_global": false,
             "is_static_import": false,
+            "member_of": null,
             "line": null,
             "column": null
           }

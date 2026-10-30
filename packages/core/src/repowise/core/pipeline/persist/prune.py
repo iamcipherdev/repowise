@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +17,23 @@ logger = structlog.get_logger("repowise.core.pipeline.persist")
 
 # Chunk size for IN (...) deletes — stays under SQLite's host-parameter limit.
 _PRUNE_CHUNK = 500
+
+
+async def delete_pages(
+    session: Any,
+    repo_id: str,
+    page_ids: list[str],
+    reason: str = "retired",
+    successors: Mapping[str, str] | None = None,
+) -> None:
+    """Retire live wiki identities without erasing their complete records.
+
+    All persistence sweeps share this boundary. The archive owner captures
+    records and transfers notes before removing live rows in this transaction.
+    """
+    from repowise.core.persistence.crud.page_archive import retire_pages
+
+    await retire_pages(session, repo_id, page_ids, reason, successors)
 
 
 async def _prune_stale_file_rows(
