@@ -13,15 +13,22 @@ from ._shared import _FUNCTION_KINDS, _TYPE_KINDS
 
 # Where a Java declaration header opens its type-parameter list: after a type's
 # name, or after a method's modifiers and annotations, before its return type.
+# Kotlin spells a function's list after `fun` (`fun <T> f()`,
+# `inline fun <reified T> f()`), which no Java modifier list contains.
 _JAVA_TYPE_PARAMETERS = re.compile(
     r"\b(?:class|interface|record)\s+\w+\s*<"
     r"|^(?:\s*(?:@[\w.]+(?:\([^)]*\))?|public|protected|private|static|final|abstract"
     r"|synchronized|native|default|strictfp)\b)*\s*<"
+    r"|\bfun\s*<"
 )
+
+# Words a Kotlin type parameter may carry before its name: declaration-site
+# variance (`in`, `out`) and `reified` on an inline function's parameters.
+_KOTLIN_TYPE_PARAMETER_PREFIXES = ("in", "out", "reified")
 
 
 def _header_type_parameters(header: str) -> set[str]:
-    """The names a Java declaration header's ``<...>`` list declares."""
+    """The names a Java or Kotlin declaration header's ``<...>`` list declares."""
     opened = _JAVA_TYPE_PARAMETERS.search(header)
     if opened is None:
         return set()
@@ -31,7 +38,10 @@ def _header_type_parameters(header: str) -> set[str]:
         close += 1
     names: set[str] = set()
     for param in strip_type_arguments(header[opened.end() : close - 1]).split(","):
-        names.update(param.split()[:1])
+        words = param.split()
+        while words and words[0] in _KOTLIN_TYPE_PARAMETER_PREFIXES:
+            words.pop(0)
+        names.update(words[:1])
     return names
 
 

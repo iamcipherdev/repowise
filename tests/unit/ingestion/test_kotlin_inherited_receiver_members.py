@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+from repowise.core.ingestion.call_receiver_typing.java import _header_type_parameters
 from repowise.core.ingestion.call_resolver import CallResolver
 from tests.unit.ingestion.test_call_resolver_strategies import _parse_all
 
@@ -71,6 +74,53 @@ def test_a_platform_caller_reaches_the_actual_member(tmp_path: Path) -> None:
     assert _targets(tmp_path, files, parents, f"{jvm}/Use.kt") == [
         f"{jvm}/Sink.kt::Sink::timeout"
     ]
+
+
+@pytest.mark.parametrize(
+    "use",
+    [
+        "package a\n\nfun <Leaf> f(leaf: Leaf) = leaf.m()\n",
+        "package a\n\ninline fun <reified Leaf> f(leaf: Leaf) = leaf.m()\n",
+        "package a\n\nclass Use<Leaf> {\n    fun f(leaf: Leaf) = leaf.m()\n}\n",
+        "package a\n\nclass Use<out Leaf> {\n    fun f(leaf: Leaf) = leaf.m()\n}\n",
+    ],
+)
+def test_a_type_parameter_shadows_a_same_named_class(tmp_path: Path, use: str) -> None:
+    """A type parameter named like a repository class binds no inherited member.
+
+    Without the shadow, `leaf.m()` would reach `Base::m` through `Leaf`'s
+    parent; with it, `Leaf` is the caller's own type parameter, so the call
+    binds nothing (issue #4978).
+    """
+    files = {
+        "a/Base.kt": "package a\n\nopen class Base {\n    open fun m() = 1\n}\n",
+        "a/Leaf.kt": "package a\n\nclass Leaf : Base()\n",
+        "a/Use.kt": use,
+    }
+    parents = {"a/Leaf.kt::Leaf": {"a/Base.kt::Base"}}
+    assert _targets(tmp_path, files, parents, "a/Use.kt") == []
+
+
+@pytest.mark.parametrize(
+    ("header", "expected"),
+    [
+        ("public <T> T f(T t)", {"T"}),
+        ("class Box<T> {", {"T"}),
+        ("class Box<K, V> {", {"K", "V"}),
+        ("fun <T> f(t: T)", {"T"}),
+        ("inline fun <reified T> f(t: T)", {"T"}),
+        ("public fun <T> f(t: T)", {"T"}),
+        ("fun <T : Number> f(t: T)", {"T"}),
+        ("fun <T, U> f(t: T, u: U)", {"T", "U"}),
+        ("class Box<out T> {", {"T"}),
+        ("class Box<in T> {", {"T"}),
+        ("fun f(t: T)", set()),
+    ],
+)
+def test_header_type_parameters_over_java_and_kotlin_headers(
+    header: str, expected: set[str]
+) -> None:
+    assert _header_type_parameters(header) == expected
 
 
 def test_a_same_named_type_in_another_package_is_no_twin(tmp_path: Path) -> None:
