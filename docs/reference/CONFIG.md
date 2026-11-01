@@ -75,6 +75,7 @@ mcp: {tools: ["+get_execution_flows", "-get_dead_code"]}
 | `enable_onboarding` | `true` | First-run onboarding prompts (CLI and web). |
 | `editor_setup` | unset | `init --no-editor-setup` writes `false`: `update` then leaves editor files alone. A later `init` with editor setup sets it `true`. |
 | `max_file_pages` | unset | Most file pages per run, highest importance first; see [below](#max_file_pages). |
+| `update.cascade_budget` | unset (adaptive) | Max pages one `update` regenerates: an integer, or `all` for no cap; see [below](#updatecascade_budget). An integer `--cascade-budget` flag overrides it for one run. |
 | `folder_coverage` | `[]` | File-page floors per folder as `"GLOB=PCT"` strings; see [below](#folder_coverage). |
 | `forges.hosts` | `{}` | Self-managed git host to forge (`github`, `gitlab`, `azure`, `bitbucket`, `generic`); see [GIT_HOSTS.md](../start/GIT_HOSTS.md#self-managed-hosts). |
 
@@ -125,6 +126,19 @@ Applies to documentation-generation calls on reasoning-capable chat models.
   `--max-file-pages N` sets it non-interactively. `update --full` and
   `generate` honour the recorded value.
 - File pages are rendered from structure, so a cap does not reduce model spend.
+
+### `update.cascade_budget`
+
+- Unset: each `update` scales the budget to the change (10 pages for one
+  changed file, 30 for up to five, three per file after that, capped at
+  50), and dependent pages past the cap are marked stale on purpose.
+- An integer raises that cap for every run; `all` removes it, so an
+  update after a large merge leaves no dependent page stale. When `all`
+  regenerates more than the adaptive budget would have chosen, `update`
+  prints the page count and a cost estimate before writing.
+- `watch` and the server's incremental job honour the key too; without
+  it, behaviour is unchanged. The adaptive default and its cap of 50 are
+  not changed by this key.
 
 ### `folder_coverage`
 

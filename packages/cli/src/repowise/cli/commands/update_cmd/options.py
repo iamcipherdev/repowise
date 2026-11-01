@@ -20,7 +20,8 @@ class UpdateOptions:
     model: str | None
     since: str | None
     reasoning: str | None
-    cascade_budget: int | None
+    # An int page count, or the string 'all' (no cap); None means unset.
+    cascade_budget: int | str | None
     dry_run: bool
     workspace: bool
     no_workspace: bool
@@ -92,6 +93,7 @@ class UpdateRun:
     git_meta_map: Any = None
     # git_meta_map plus the stored rows of every re-rendered file; render only.
     render_git_meta: Any = None
+    # Resolved budget for this run; None means unlimited (the 'all' budget).
     cascade_budget: int | None = None
     affected: Any = None
     partial_health_report: Any = None

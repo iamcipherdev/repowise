@@ -249,6 +249,22 @@ class TestGetAffectedPages:
         result = d.get_affected_pages([diff], graph=g, cascade_budget=50)
         assert result.stale_due_to_budget == 0
 
+    def test_unlimited_budget_regenerates_everything(self, tmp_path: Path) -> None:
+        """'all' (None) regenerates every candidate and marks nothing stale."""
+        d = self._detector(tmp_path)
+        g = nx.DiGraph()
+        files = [f"file{i}.py" for i in range(10)]
+        for f in files:
+            g.add_node(f)
+        g.add_node("file0.py")
+        for f in files[1:]:
+            g.add_edge(f, "file0.py")
+
+        diff = self._simple_file_diff("file0.py")
+        result = d.get_affected_pages([diff], graph=g, cascade_budget=None)
+        assert len(result.regenerate) == 10
+        assert result.stale_due_to_budget == 0
+
     def test_all_lists_are_disjoint(self, tmp_path: Path) -> None:
         """regenerate, rename_patch, and decay_only should be disjoint."""
         d = self._detector(tmp_path)
@@ -334,16 +350,12 @@ class TestAffectedPagesPagerankParam:
             "f2.py": 0.01,
             "f3.py": 0.01,
         }
-        result = d.get_affected_pages(
-            [self._diff("f0.py")], graph=g, cascade_budget=3, pagerank=pr
-        )
+        result = d.get_affected_pages([self._diff("f0.py")], graph=g, cascade_budget=3, pagerank=pr)
         # The changed file first, then importers by the supplied pagerank.
         assert result.regenerate == ["f0.py", "f5.py", "f4.py"]
         assert set(result.decay_only) == {"f1.py", "f2.py", "f3.py"}
 
-    def test_without_pagerank_falls_back_to_internal_computation(
-        self, tmp_path: Path
-    ) -> None:
+    def test_without_pagerank_falls_back_to_internal_computation(self, tmp_path: Path) -> None:
         """Omitting the param keeps the old self-computed ordering path:
         the candidate partition (regenerate + decay) is unchanged."""
         d = ChangeDetector(tmp_path)
@@ -355,9 +367,7 @@ class TestAffectedPagesPagerankParam:
 
         result = d.get_affected_pages([self._diff("f0.py")], graph=g, cascade_budget=3)
         assert len(result.regenerate) == 3
-        assert set(result.regenerate) | set(result.decay_only) == {
-            f"f{i}.py" for i in range(6)
-        }
+        assert set(result.regenerate) | set(result.decay_only) == {f"f{i}.py" for i in range(6)}
 
 
 class TestAffectedPagesStalenessPriority:
@@ -487,3 +497,56 @@ class TestParseBytesLanguage:
 
         assert parsed is not None
         assert parsed.file_info.language == "objectivec"
+
+
+# ---------------------------------------------------------------------------
+# resolve_cascade_budget — flag > config > adaptive; 'all' means unlimited
+# ---------------------------------------------------------------------------
+
+
+class TestResolveCascadeBudget:
+    def _one_diff(self) -> list:
+        from repowise.core.ingestion.change_detector import FileDiff
+
+        return [
+            FileDiff(
+                path="a.py",
+                status="modified",  # type: ignore[arg-type]
+                old_path=None,
+                old_parsed=None,
+                new_parsed=_parsed([], path="a.py"),
+                symbol_diff=None,
+            )
+        ]
+
+    def test_flag_wins_over_config(self) -> None:
+        from repowise.core.ingestion.change_detector import resolve_cascade_budget
+
+        assert resolve_cascade_budget(7, "all", self._one_diff(), 100) == 7
+
+    def test_config_wins_over_adaptive(self) -> None:
+        from repowise.core.ingestion.change_detector import resolve_cascade_budget
+
+        assert resolve_cascade_budget(None, 42, self._one_diff(), 100) == 42
+
+    def test_all_flag_and_config_mean_unlimited(self) -> None:
+        from repowise.core.ingestion.change_detector import resolve_cascade_budget
+
+        assert resolve_cascade_budget("all", None, self._one_diff(), 100) is None
+        assert resolve_cascade_budget(None, "all", self._one_diff(), 100) is None
+        assert resolve_cascade_budget(None, "ALL", self._one_diff(), 100) is None
+
+    def test_unset_falls_back_to_adaptive(self) -> None:
+        from repowise.core.ingestion.change_detector import resolve_cascade_budget
+
+        assert resolve_cascade_budget(None, None, self._one_diff(), 100) == 10
+        assert resolve_cascade_budget(None, None, [], 100) == 0
+
+    def test_invalid_values_raise(self) -> None:
+        import pytest
+
+        from repowise.core.ingestion.change_detector import resolve_cascade_budget
+
+        for bad in ("banana", -1, 3.5, True):
+            with pytest.raises(ValueError, match="Invalid cascade budget"):
+                resolve_cascade_budget(None, bad, self._one_diff(), 100)

@@ -241,7 +241,7 @@ repowise update --full --provider anthropic   # fast index to full
 | `--provider` / `--model` | Override for this run. | persisted choice |
 | `--reasoning` | Same choices as `init`. | |
 | `--since` | Git ref to diff from (overrides `state.json`). | last sync |
-| `--cascade-budget` | Max pages to regenerate. | auto-scaled |
+| `--cascade-budget` | Max pages to regenerate; `all` regenerates every affected page. Also settable as `update.cascade_budget` in `config.yaml` (the flag wins for one run). | auto-scaled |
 | `--concurrency` | Max concurrent LLM calls. | `10` |
 | `--yes` / `-y` | Skip the `--full` cost prompt. | off |
 | `--dry-run` | Preview only. | off |

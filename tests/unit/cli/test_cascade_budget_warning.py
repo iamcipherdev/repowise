@@ -91,3 +91,13 @@ def test_loader_reads_the_split_from_the_store(tmp_path: Path) -> None:
 
     asyncio.run(build())
     assert load_cascade_overflow_split(repo_path, ["src/a.py", "src/b.py"]) == (3, 3)
+
+
+def test_warning_mentions_always_current_config_key() -> None:
+    out = _render(50, 2752, (122, 1235))
+    assert "update.cascade_budget: all" in out
+
+
+def test_unsplit_warning_mentions_always_current_config_key() -> None:
+    out = _render(50, 10, None)
+    assert "update.cascade_budget: all" in out

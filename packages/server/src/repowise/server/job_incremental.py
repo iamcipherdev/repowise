@@ -231,12 +231,13 @@ def _plan_incremental_page_regen(
         return None
 
     from repowise.core.ingestion import ChangeDetector
-    from repowise.core.ingestion.change_detector import compute_adaptive_budget
+    from repowise.core.ingestion.change_detector import resolve_cascade_budget
     from repowise.core.repo_config import load_repo_config
 
+    repo_cfg = load_repo_config(repo_path)
     detector = ChangeDetector(
         repo_path,
-        exclude_patterns=load_repo_config(repo_path).get("exclude_patterns"),
+        exclude_patterns=repo_cfg.get("exclude_patterns"),
         include_submodules=bool(state.get("include_submodules", False)),
         include_nested_repos=bool(state.get("include_nested_repos", False)),
     )
@@ -244,7 +245,15 @@ def _plan_incremental_page_regen(
     if not file_diffs:
         return None
 
-    cascade_budget = compute_adaptive_budget(file_diffs, result.file_count)
+    # Same resolution as the CLI: the config key honoured here keeps a
+    # long-running server from drifting stale under heavy churn.
+    update_cfg = repo_cfg.get("update") if isinstance(repo_cfg, dict) else None
+    cascade_budget = resolve_cascade_budget(
+        None,
+        update_cfg.get("cascade_budget") if isinstance(update_cfg, dict) else None,
+        file_diffs,
+        result.file_count,
+    )
     affected = detector.get_affected_pages(
         file_diffs,
         result.graph_builder.graph(),

@@ -102,6 +102,40 @@ def compute_adaptive_budget(file_diffs: list[FileDiff], total_files: int) -> int
     return min(n * 3, 50, total_files)
 
 
+def resolve_cascade_budget(
+    flag_value: int | str | None,
+    config_value: int | str | None,
+    file_diffs: list[FileDiff],
+    total_files: int,
+) -> int | None:
+    """Resolve the effective cascade budget for one run.
+
+    Precedence: the explicit ``--cascade-budget`` flag, then the
+    ``update.cascade_budget`` config key, then the adaptive budget.  The
+    value ``all`` (flag or config) means no cap on dependents and resolves
+    to ``None``, which :meth:`ChangeDetector.get_affected_pages` treats as
+    unlimited.  Any other non-integer value raises ``ValueError`` rather
+    than silently falling back to the adaptive budget.
+    """
+    value = flag_value if flag_value is not None else config_value
+    if value is None:
+        return compute_adaptive_budget(file_diffs, total_files)
+    if isinstance(value, str):
+        if value.strip().lower() == "all":
+            return None
+        try:
+            value = int(value.strip())
+        except ValueError:
+            raise ValueError(
+                f"Invalid cascade budget {value!r}: expected an integer or 'all'"
+            ) from None
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"Invalid cascade budget {value!r}: expected an integer or 'all'")
+    if value < 0:
+        raise ValueError(f"Invalid cascade budget {value!r}: expected a non-negative integer")
+    return value
+
+
 # ---------------------------------------------------------------------------
 # ChangeDetector
 # ---------------------------------------------------------------------------
@@ -466,7 +500,7 @@ class ChangeDetector:
         self,
         file_diffs: list[FileDiff],
         graph: object,  # nx.DiGraph
-        cascade_budget: int = 30,
+        cascade_budget: int | None = 30,
         pagerank: dict[str, float] | None = None,
         stale_pages: dict[str, float] | None = None,
     ) -> AffectedPages:
@@ -475,7 +509,8 @@ class ChangeDetector:
         Args:
             file_diffs: Output of get_changed_files().
             graph: The dependency graph (networkx DiGraph, nodes are file paths).
-            cascade_budget: Max number of pages to fully regenerate per run.
+            cascade_budget: Max number of pages to fully regenerate per run;
+                ``None`` means unlimited (the ``all`` budget).
             pagerank: Precomputed scores for budget ordering (the update path
                 passes GraphBuilder's cached file pagerank so this function
                 does not recompute a full-graph pass). Falls back to an
@@ -567,11 +602,16 @@ class ChangeDetector:
             reverse=True,
         )
 
-        regenerate = all_pages_needing_regen[:cascade_budget]
-        decay_only = (
-            all_pages_needing_regen[cascade_budget:] + sorted(two_hop) + sorted(co_change_decay)
-        )
-        stale_due_to_budget = max(0, len(all_pages_needing_regen) - cascade_budget)
+        if cascade_budget is None:
+            regenerate = all_pages_needing_regen
+            decay_only = sorted(two_hop) + sorted(co_change_decay)
+            stale_due_to_budget = 0
+        else:
+            regenerate = all_pages_needing_regen[:cascade_budget]
+            decay_only = (
+                all_pages_needing_regen[cascade_budget:] + sorted(two_hop) + sorted(co_change_decay)
+            )
+            stale_due_to_budget = max(0, len(all_pages_needing_regen) - cascade_budget)
         rename_patch = [p for p in rename_candidates if p in regenerate]
 
         return AffectedPages(

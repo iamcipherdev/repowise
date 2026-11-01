@@ -104,6 +104,7 @@ log = structlog.get_logger(__name__)
 #: ``state.json`` key: the commit whose run last looked for files with no page.
 FILE_PAGE_FILL_KEY = "file_page_fill_commit"
 
+
 def _fail_on_embed_failure(
     repo_path: Path, embedder: str | None, embed_failed_pages: int, emitter: Any
 ) -> None:
@@ -279,6 +280,26 @@ def _surface_reindex_recommendation(repo_path, verdict, *, emitter: Any, dry_run
         record_reindex_notice_shown(repo_path, verdict)
 
 
+def _parse_cascade_budget_option(ctx: Any, param: Any, value: Any) -> int | str | None:
+    """Parse ``--cascade-budget``: an integer page count, or ``all``.
+
+    Click passes the raw string; ``all`` survives as the string so the
+    resolver can distinguish it from an integer, and anything else that is
+    not an integer is rejected here rather than deep in the run.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str) and value.strip().lower() == "all":
+        return "all"
+    try:
+        parsed = int(str(value).strip())
+    except (TypeError, ValueError):
+        raise click.BadParameter(f"expected an integer or 'all', got {value!r}") from None
+    if parsed < 0:
+        raise click.BadParameter(f"expected a non-negative integer, got {value!r}")
+    return parsed
+
+
 @click.command("update")
 @click.argument("path", required=False, default=None)
 @click.option("--provider", "provider_name", default=None, help="LLM provider name.")
@@ -296,9 +317,14 @@ def _surface_reindex_recommendation(repo_path, verdict, *, emitter: Any, dry_run
 )
 @click.option(
     "--cascade-budget",
-    type=int,
+    metavar="N|all",
+    callback=_parse_cascade_budget_option,
     default=None,
-    help="Max pages to regenerate (auto-scaled if unset).",
+    help=(
+        "Max pages to regenerate (auto-scaled if unset); 'all' regenerates "
+        "every affected page. An integer flag overrides the "
+        "update.cascade_budget config key."
+    ),
 )
 @click.option(
     "--dry-run", is_flag=True, default=False, help="Show affected pages without regenerating."
@@ -425,7 +451,7 @@ def update_command(
     model: str | None,
     since: str | None,
     reasoning: str | None,
-    cascade_budget: int | None,
+    cascade_budget: int | str | None,
     dry_run: bool,
     workspace: bool,
     no_workspace: bool,
@@ -513,9 +539,7 @@ def _render_full_upgrade_dry_run(
     console.print(f"  Provider: [cyan]{planned_provider}[/cyan] / [cyan]{planned_model}[/cyan]")
     console.print(f"  Git tier: [cyan]{current_git_tier}[/cyan] -> [cyan]FULL[/cyan]")
     console.print(f"  Pages currently recorded: [cyan]{page_label}[/cyan]")
-    console.print(
-        f"  Persisted scope: [cyan]{scope_line(scope)}[/cyan]"
-    )
+    console.print(f"  Persisted scope: [cyan]{scope_line(scope)}[/cyan]")
     console.print(
         "  Documentation for the whole repository: written by the model after a cost "
         "preview, or built from code when no model is configured. Completed stages "
@@ -709,8 +733,7 @@ def _update_workspace_target(opts: UpdateOptions, run: UpdateRun, target) -> Upd
         return _full_upgrade(opts, run)
     if opts.full:
         raise reasoned_error(
-            "--full upgrades one repo at a time. Run it inside that repo, or pass "
-            "--repo <alias>.",
+            "--full upgrades one repo at a time. Run it inside that repo, or pass --repo <alias>.",
             reason="full_needs_one_repo",
         )
     with _errors_reported(run):
@@ -947,8 +970,7 @@ def _assess_staleness(opts: UpdateOptions, run: UpdateRun) -> None:
     run.scanner_changed = security_scanner_changed(state)
     if run.scanner_changed:
         console.print(
-            "[yellow]Security scanner changed since this index was scanned; "
-            "rescanning.[/yellow]"
+            "[yellow]Security scanner changed since this index was scanned; rescanning.[/yellow]"
         )
     # Pages stale for reasons no commit explains; read only when git is current.
     if run.git_is_current:
@@ -1383,17 +1405,34 @@ def _working_tree_only(run: UpdateRun) -> bool:
     )
 
 
+def _config_cascade_budget(cfg: dict) -> int | str | None:
+    """The ``update.cascade_budget`` config key, or ``None`` when unset."""
+    update_cfg = cfg.get("update") if isinstance(cfg, dict) else None
+    if not isinstance(update_cfg, dict):
+        return None
+    return update_cfg.get("cascade_budget")
+
+
 def _plan_pages(opts: UpdateOptions, run: UpdateRun) -> None:
     """Pick the pages to regenerate and the pages to only mark stale."""
     _stage(run, "plan_pages")
 
     run.timings.start("plan_pages")
-    run.cascade_budget = opts.cascade_budget
-    if run.cascade_budget is None:
-        from repowise.core.ingestion.change_detector import compute_adaptive_budget
+    from repowise.core.ingestion.change_detector import resolve_cascade_budget
 
-        run.cascade_budget = compute_adaptive_budget(run.file_diffs, run.file_count)
-        if opts.verbose:
+    # One resolution for every path that plans pages: the explicit flag,
+    # then this repo's config key, then the adaptive budget. Watch and the
+    # workspace loop pass no flag, so they honour the config key for free.
+    run.cascade_budget = resolve_cascade_budget(
+        opts.cascade_budget,
+        _config_cascade_budget(run.cfg),
+        run.file_diffs,
+        run.file_count,
+    )
+    if opts.verbose:
+        if run.cascade_budget is None:
+            console.print("Cascade budget: [cyan]all[/cyan]")
+        elif opts.cascade_budget is None and _config_cascade_budget(run.cfg) is None:
             console.print(f"Adaptive cascade budget: [cyan]{run.cascade_budget}[/cyan]")
     # The builder's cached pagerank spares a full-graph pass.
     from .deterministic import load_stale_file_page_ages
@@ -1415,6 +1454,46 @@ def _plan_pages(opts: UpdateOptions, run: UpdateRun) -> None:
     _add_stale_pages(run, stale_renderer_paths, _unpaged_file_paths(run))
     _widen_for_full_render(run)
     _report_page_plan(run)
+    _report_unlimited_cascade_preview(opts, run)
+
+
+def _report_unlimited_cascade_preview(opts: UpdateOptions, run: UpdateRun) -> None:
+    """Cost visibility for the ``all`` budget, before anything is written.
+
+    Planning precedes regeneration, so this prints while the plan can still
+    be abandoned. It only speaks up when the plan exceeds what the adaptive
+    budget would have chosen; a small plan under ``all`` needs no warning.
+    The spend figure is best-effort, priced like the wiki-rebuild estimate;
+    when no provider resolves, the page count still shows.
+    """
+    if run.cascade_budget is not None:
+        return
+    from repowise.core.ingestion.change_detector import compute_adaptive_budget
+
+    adaptive = compute_adaptive_budget(run.file_diffs, run.file_count)
+    count = len(run.affected.regenerate)
+    if count <= adaptive:
+        return
+    console.print(
+        f"[yellow]Cascade budget 'all': regenerating {count} pages "
+        f"(adaptive budget would have chosen {adaptive}).[/yellow]"
+    )
+    try:
+        from repowise.cli.cost_gate import spend_phrase
+        from repowise.cli.helpers import resolve_provider
+        from repowise.core.cost_estimator import estimate_cost
+        from repowise.core.generation.scope import build_cost_plans
+
+        provider = resolve_provider(opts.provider_name, opts.model, run.repo_path)
+        est = estimate_cost(
+            build_cost_plans({f"file:{path}" for path in run.affected.regenerate}),
+            provider.provider_name,
+            provider.model_name,
+            repo_path=run.repo_path,
+        )
+        console.print(f"  {spend_phrase(est, opts.concurrency)}.")
+    except Exception:
+        return
 
 
 def _unpaged_file_paths(run: UpdateRun) -> list[str]:
@@ -2212,7 +2291,7 @@ def run_update(
     model: str | None,
     since: str | None,
     reasoning: str | None,
-    cascade_budget: int | None,
+    cascade_budget: int | str | None,
     dry_run: bool,
     workspace: bool,
     no_workspace: bool,
